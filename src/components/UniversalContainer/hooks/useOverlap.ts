@@ -1,44 +1,64 @@
-import { RefObject, useEffect, useState } from "react";
-import { debounce } from "lodash";
+import {ReactNode, RefObject, useEffect, useState} from 'react';
+import { debounce } from 'lodash';
 
-const useOverlap = (
-  referenceElementId: string,
-  containerRef: RefObject<HTMLDivElement>
-) => {
-  const [isOverlapping, setIsOverlapping] = useState(false);
+interface ReferenceContent {
+  referenceElementId: string;
+  content: ReactNode;
+}
+
+const useOverlap = (referenceContents: ReferenceContent[], containerRef: RefObject<HTMLDivElement>) => {
+  const [currentContent, setCurrentContent] = useState<React.ReactNode>(null);
+  const [maxSize, setMaxSize] = useState({ maxWidth: 300, maxHeight: 200 });
 
   useEffect(() => {
+    const updateSize = () => {
+      const maxWidth = window.innerWidth - 20; // 10px margin on each side
+      const maxHeight = window.innerHeight - 20; // 10px margin on each side
+      setMaxSize({ maxWidth, maxHeight });
+    };
+
     const checkOverlap = () => {
-      const referenceElement = document.getElementById(referenceElementId);
       const containerElement = containerRef.current;
+      if (!containerElement) return;
 
-      if (!referenceElement || !containerElement) return;
+      let overlappingContent = null;
+      referenceContents.forEach(({ referenceElementId, content }) => {
+        const referenceElement = document.getElementById(referenceElementId);
+        if (!referenceElement) return;
 
-      const referenceRect = referenceElement.getBoundingClientRect();
-      const containerRect = containerElement.getBoundingClientRect();
+        const referenceRect = referenceElement.getBoundingClientRect();
+        const containerRect = containerElement.getBoundingClientRect();
 
-      const isOverlapping =
-        referenceRect.left < containerRect.right &&
-        referenceRect.right > containerRect.left &&
-        referenceRect.top < containerRect.bottom &&
-        referenceRect.bottom > containerRect.top;
+        const isOverlapping =
+            referenceRect.left < containerRect.right &&
+            referenceRect.right > containerRect.left &&
+            referenceRect.top < containerRect.bottom &&
+            referenceRect.bottom > containerRect.top;
 
-      setIsOverlapping(isOverlapping);
+        if (isOverlapping) {
+          overlappingContent = content;
+        }
+      });
+
+      setCurrentContent(overlappingContent);
     };
 
     const debouncedCheckOverlap = debounce(checkOverlap, 100);
 
-    window.addEventListener("scroll", debouncedCheckOverlap);
-    window.addEventListener("resize", debouncedCheckOverlap);
+    window.addEventListener('resize', updateSize);
+    window.addEventListener('scroll', debouncedCheckOverlap);
+    window.addEventListener('resize', debouncedCheckOverlap);
+    updateSize();
     checkOverlap();
 
     return () => {
-      window.removeEventListener("scroll", debouncedCheckOverlap);
-      window.removeEventListener("resize", debouncedCheckOverlap);
+      window.removeEventListener('resize', updateSize);
+      window.removeEventListener('scroll', debouncedCheckOverlap);
+      window.removeEventListener('resize', debouncedCheckOverlap);
     };
-  }, [referenceElementId, containerRef]);
+  }, [referenceContents, containerRef]);
 
-  return { isOverlapping };
+  return { currentContent, maxSize };
 };
 
 export default useOverlap;
